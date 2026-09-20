@@ -32,8 +32,8 @@ $("#go").onclick=async()=>{
   const u=results.filter(x=>x.status==="matched_unverified").length;
   const f=results.filter(x=>x.status==="already_free"||x.status==="region_unverified").length;
   const miss=results.filter(x=>x.status==="unmatched").length;
-  const warn=p.stats?.regionLimited?`<div class="meta"><b>⚠ Render 新加坡节点存在地区限制。</b> “待大陆验证”不代表最终可播结论。</div>`:"";
-  $("#summary").innerHTML=`<b>${p.name}</b><div class="meta">${p.songs.length} 首 · ${f} 首目录免费/已免费 · ${n} 首验证替代 · ${u} 首免费候选待验证 · ${miss} 首未匹配</div>${warn}`;
+  const finalWarn=p.stats?.regionLimited?`<div class="meta"><b>⚠ Render 新加坡节点存在地区限制。</b> “待大陆验证”不代表最终可播结论。</div>`:"";
+  $("#summary").innerHTML=`<b>${p.name}</b><div class="meta">${p.songs.length} 首 · ${f} 首目录免费/已免费 · ${n} 首验证替代 · ${u} 首免费候选待验证 · ${miss} 首未匹配</div>${finalWarn}`;
   $("#actions").classList.remove("hidden");
  }catch(e){
   $("#summary").classList.remove("hidden");
@@ -47,7 +47,7 @@ $("#csv").onclick=()=>{let rows=[["title","artist","netease_id","result"],...res
 $("#diag").onclick=()=>{
  const report={
    generatedAt:new Date().toISOString(),
-   appVersion:"0.4",
+   appVersion:"0.4.1",
    playlist:playlistMeta,
    results:results.map(r=>({
      source:{id:r.source?.id,name:r.source?.name,artist:artist(r.source||{}),duration:r.source?.dt||r.source?.duration,privilege:r.source?.privilege},
