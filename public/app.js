@@ -1,11 +1,11 @@
 const $=s=>document.querySelector(s); let results=[], playlistName="", playlistMeta=null;
 const artist=s=>(s.ar||s.artists||[]).map(x=>x.name).join(" / ");
-const clean=s=>({id:s.id,name:s.name,dt:s.dt||s.duration,ar:s.ar||s.artists,privilege:s.privilege});
+const clean=s=>({id:s.id,name:s.name,dt:s.dt||s.duration,ar:s.ar||s.artists,fee:s.fee,privilege:s.privilege});
 function render(r,i){
  const src=r.source, dst=r.match;
  const labels={
   already_free:"本服务器可免费播放",
-  region_unverified:"目录显示免费 · 地区待验证",
+  catalog_free_unverified:"基础码率免费 · 地区待验证",
   matched:`已找到免费替代 · ${Math.round((r.score||0)*100)}%`,
   matched_unverified:`找到免费候选 · 待大陆验证 · ${Math.round((r.score||0)*100)}%`,
   unmatched:"未找到可靠替代"
@@ -30,7 +30,7 @@ $("#go").onclick=async()=>{
   }
   const n=results.filter(x=>x.status==="matched").length;
   const u=results.filter(x=>x.status==="matched_unverified").length;
-  const f=results.filter(x=>x.status==="already_free"||x.status==="region_unverified").length;
+  const f=results.filter(x=>x.status==="already_free"||x.status==="catalog_free_unverified").length;
   const miss=results.filter(x=>x.status==="unmatched").length;
   const finalWarn=p.stats?.regionLimited?`<div class="meta"><b>⚠ Render 新加坡节点存在地区限制。</b> “待大陆验证”不代表最终可播结论。</div>`:"";
   $("#summary").innerHTML=`<b>${p.name}</b><div class="meta">${p.songs.length} 首 · ${f} 首目录免费/已免费 · ${n} 首验证替代 · ${u} 首免费候选待验证 · ${miss} 首未匹配</div>${finalWarn}`;
@@ -47,13 +47,13 @@ $("#csv").onclick=()=>{let rows=[["title","artist","netease_id","result"],...res
 $("#diag").onclick=()=>{
  const report={
    generatedAt:new Date().toISOString(),
-   appVersion:"0.4.1",
+   appVersion:"0.5",
    playlist:playlistMeta,
    results:results.map(r=>({
-     source:{id:r.source?.id,name:r.source?.name,artist:artist(r.source||{}),duration:r.source?.dt||r.source?.duration,privilege:r.source?.privilege},
+     source:{id:r.source?.id,name:r.source?.name,artist:artist(r.source||{}),duration:r.source?.dt||r.source?.duration,fee:r.source?.fee,privilege:r.source?.privilege},
      status:r.status,
      score:r.score,
-     match:r.match?{id:r.match.id,name:r.match.name,artist:artist(r.match),duration:r.match.dt||r.match.duration,privilege:r.match.privilege}:null,
+     match:r.match?{id:r.match.id,name:r.match.name,artist:artist(r.match),duration:r.match.dt||r.match.duration,fee:r.match.fee,privilege:r.match.privilege}:null,
      candidates:(r.candidates||[]).map(c=>({score:c.score,id:c.song?.id,name:c.song?.name,artist:artist(c.song||{}),duration:c.song?.dt||c.song?.duration,privilege:c.song?.privilege}))
    }))
  };
