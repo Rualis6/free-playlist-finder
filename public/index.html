@@ -1,0 +1,9 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Free Playlist Finder</title><link rel="stylesheet" href="/style.css"></head><body>
+<main><header><div class="logo">♪</div><div><h1>Free Playlist Finder</h1><p>寻找同一平台中可免费播放的同曲版本，不绕过会员限制。</p></div></header>
+<section class="card"><label>网易云歌单链接或 ID</label><div class="row"><input id="url" placeholder="https://music.163.com/playlist?id=..."><button id="go">分析歌单</button></div>
+<div class="note">当前 MVP：网易云。只读取公开歌单，不需要账号或 Cookie。</div></section>
+<section id="summary" class="summary hidden"></section><section id="songs" class="songs"></section>
+<div id="actions" class="actions hidden"><button id="copy">复制免费版歌曲清单</button><button class="secondary" id="csv">导出 CSV</button><button class="secondary" id="diag">导出诊断 JSON</button></div>
+<footer>匹配会优先比较歌曲名、艺人和时长；低置信度结果不会自动替换。</footer></main>
+<script src="/app.js"></script></body></html>
