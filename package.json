@@ -1,0 +1,8 @@
+{
+  "name": "free-playlist-finder",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {"start":"node server.js","dev":"node --watch server.js"},
+  "engines":{"node":">=18"}
+}
