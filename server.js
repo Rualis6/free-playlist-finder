@@ -110,26 +110,43 @@ function freePrivilege(p){
   if(!p) return false;
   return p.st>=0 && (p.pl||0)>0;
 }
-function catalogClass(p){
-  if(!p) return "unknown";
-  if(p.fee===1) return "vip";
-  if(p.fee===4) return "purchase";
-  if(p.fee===0 || p.fee===8) return "free_catalog";
+function baseChargeTypes(p){
+  return (p?.chargeInfoList||[])
+    .filter(x=>(x.rate||0)<=320000)
+    .map(x=>x.chargeType)
+    .filter(x=>Number.isFinite(x));
+}
+function catalogClass(songOrPriv){
+  const p=songOrPriv?.privilege || songOrPriv;
+  const songFee=songOrPriv?.fee;
+  const privFee=p?.fee;
+
+  // Strong signals when present.
+  if(songFee===4 || privFee===4) return "purchase";
+  if(songFee===1 || privFee===1) return "vip";
+  if(songFee===8 || privFee===8) return "free_limited";
+
+  // Overseas NetEase responses may flatten fee to 0 and mark st<0 for everything.
+  // chargeInfoList often still preserves the base-tier charging pattern.
+  const base=baseChargeTypes(p);
+  if(base.length){
+    if(base.every(x=>x===1)) return "vip_likely";
+    if(base.some(x=>x===0)) return "free_catalog";
+  }
+
+  if(songFee===0 || privFee===0) return "free_unknown";
   return "unknown";
 }
-function accessClass(p){
-  if(!p) return "unknown";
-  if(p.st<0) return "server_unavailable";
-  if(p.pl>0) return "free_playable";
-  if(p.fee===1) return "vip";
-  if(p.fee===4) return "purchase";
-  return "restricted";
+function isFreeCatalog(x){
+  return ["free_catalog","free_limited"].includes(catalogClass(x));
+}
+function isVipCatalog(x){
+  return ["vip","vip_likely"].includes(catalogClass(x));
 }
 function regionLimited(songs){
   if(!songs.length) return false;
   const neg=songs.filter(s=>(s.privilege?.st??0)<0).length;
-  const freeCatalog=songs.filter(s=>catalogClass(s.privilege)==="free_catalog").length;
-  return neg/songs.length>=0.75 && freeCatalog/songs.length>=0.5;
+  return neg/songs.length>=0.75;
 }
 async function searchNcm(q,limit=12){
   const body=`s=${encodeURIComponent(q)}&type=1&limit=${limit}&offset=0`;
@@ -144,30 +161,35 @@ async function details(ids){
   return (x.songs||[]).map(s=>({...s, privilege:pm.get(s.id)}));
 }
 async function matchOne(s){
-  const srcCatalog=catalogClass(s.privilege);
+  const cls=catalogClass(s);
+
   if(freePrivilege(s.privilege))
-    return {source:s,status:"already_free",match:s,score:1,catalogClass:srcCatalog};
+    return {source:s,status:"already_free",match:s,score:1,catalogClass:cls};
 
-  // If the upstream server is overseas/region-limited, a fee=0/8 track can look
-  // unavailable even though it is a free catalogue item in the target market.
-  if(srcCatalog==="free_catalog" && (s.privilege?.st??0)<0)
-    return {source:s,status:"region_unverified",match:s,score:1,catalogClass:srcCatalog};
+  if(isFreeCatalog(s))
+    return {source:s,status:"catalog_free_unverified",match:s,score:1,catalogClass:cls};
 
+  // Only VIP-like or otherwise restricted songs need an alternate search.
   const found=await searchNcm(`${s.name} ${artists(s)}`);
   const ds=await details(found.map(x=>x.id));
   const scored=ds.filter(x=>x.id!==s.id)
-    .map(x=>({song:x,score:score(s,x),catalogClass:catalogClass(x.privilege),playableHere:freePrivilege(x.privilege)}))
+    .map(x=>({
+      song:x,
+      score:score(s,x),
+      catalogClass:catalogClass(x),
+      playableHere:freePrivilege(x.privilege)
+    }))
     .sort((a,b)=>b.score-a.score);
 
   const verified=scored.filter(x=>x.playableHere && x.score>=.78);
   if(verified[0])
-    return {source:s,status:"matched",match:verified[0].song,score:verified[0].score,catalogClass:srcCatalog,candidates:scored.slice(0,5)};
+    return {source:s,status:"matched",match:verified[0].song,score:verified[0].score,catalogClass:cls,candidates:scored.slice(0,5)};
 
-  const catalogCandidate=scored.filter(x=>x.catalogClass==="free_catalog" && x.score>=.78)[0];
+  const catalogCandidate=scored.filter(x=>isFreeCatalog(x.song) && x.score>=.78)[0];
   if(catalogCandidate)
-    return {source:s,status:"matched_unverified",match:catalogCandidate.song,score:catalogCandidate.score,catalogClass:srcCatalog,candidates:scored.slice(0,5)};
+    return {source:s,status:"matched_unverified",match:catalogCandidate.song,score:catalogCandidate.score,catalogClass:cls,candidates:scored.slice(0,5)};
 
-  return {source:s,status:"unmatched",match:null,score:scored[0]?.score||0,catalogClass:srcCatalog,candidates:scored.slice(0,5)};
+  return {source:s,status:"unmatched",match:null,score:scored[0]?.score||0,catalogClass:cls,candidates:scored.slice(0,5)};
 }
 async function api(req,res,u){
   if(u.pathname==="/api/playlist"){
@@ -177,9 +199,10 @@ async function api(req,res,u){
     const stats={
       total:p.songs.length,
       playableHere:p.songs.filter(s=>freePrivilege(s.privilege)).length,
-      catalogFree:p.songs.filter(s=>catalogClass(s.privilege)==="free_catalog").length,
-      vip:p.songs.filter(s=>catalogClass(s.privilege)==="vip").length,
-      purchase:p.songs.filter(s=>catalogClass(s.privilege)==="purchase").length,
+      catalogFree:p.songs.filter(s=>isFreeCatalog(s)).length,
+      vip:p.songs.filter(s=>isVipCatalog(s)).length,
+      purchase:p.songs.filter(s=>catalogClass(s)==="purchase").length,
+      unknown:p.songs.filter(s=>["unknown","free_unknown"].includes(catalogClass(s))).length,
       serverUnavailable:p.songs.filter(s=>(s.privilege?.st??0)<0).length,
       regionLimited:regionLimited(p.songs)
     };
